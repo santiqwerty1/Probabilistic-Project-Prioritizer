@@ -1,0 +1,5 @@
+{
+  "name": "Probabilistic Project Prioritizer",
+  "description": "A minimal yet fully functional personal project prioritization app that dynamically allocates focus based on time and project probabilities. Users can assign multiple projects with probability weights to each hour of the week, and the app will probabilistically select one project to focus on for the current time.",
+  "requestFramePermissions": []
+}
