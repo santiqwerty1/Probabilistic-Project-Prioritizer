@@ -233,7 +233,7 @@ const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                         
                         {viewMode === 'detail' && (
                             <div className="flex items-center gap-2">
-                                <MagnifyingGlassMinusIcon className="w-5 h-5 text-gray-400" />
+                                <MagnifyingGlassPlusIcon className="w-5 h-5 text-gray-400" />
                                 <input
                                     type="range"
                                     id="zoom"
@@ -244,7 +244,7 @@ const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                     className="w-24 h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                                     title="Zoom schedule view"
                                 />
-                                <MagnifyingGlassPlusIcon className="w-5 h-5 text-gray-400" />
+                                <MagnifyingGlassMinusIcon className="w-5 h-5 text-gray-400" />
                             </div>
                         )}
                     </>
