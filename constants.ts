@@ -13,3 +13,5 @@ export const PROJECT_COLORS = [
 ];
 
 export const UNALLOCATED_PROJECT_ID = 'rest';
+
+export const EPSILON = 0.1;

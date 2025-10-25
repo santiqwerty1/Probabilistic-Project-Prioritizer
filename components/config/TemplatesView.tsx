@@ -1,138 +1,111 @@
 import React, { useState } from 'react';
-import { Day, DayTemplate } from '../../types';
-import { useSchedule } from '../../contexts/ScheduleContext';
-import { PlusIcon, TrashIcon, ClipboardDocumentListIcon, PencilIcon } from '../common/Icons';
+import { useTemplates } from '../../contexts/TemplatesContext';
+import { DayTemplate } from '../../types';
+import { PlusIcon, PencilIcon, TrashIcon } from '../common/icons';
+import Modal from '../common/Modal';
 import ConfirmationModal from '../common/ConfirmationModal';
 import TemplateEditorModal from './TemplateEditorModal';
-import ApplyTemplateModal from './ApplyTemplateModal';
 import { useToast } from '../../contexts/ToastContext';
 
 const TemplatesView: React.FC = () => {
-    const { templates, addTemplate, updateTemplate, deleteTemplate, applyTemplate } = useSchedule();
-    const { addToast } = useToast();
-    const [isEditorOpen, setIsEditorOpen] = useState(false);
-    const [isApplyOpen, setIsApplyOpen] = useState(false);
-    
-    const [activeTemplate, setActiveTemplate] = useState<DayTemplate | null>(null);
-    const [deletingTemplateId, setDeletingTemplateId] = useState<string | null>(null);
+  const { templates, setTemplates } = useTemplates();
+  const { addToast } = useToast();
 
-    const handleOpenCreator = () => {
-        setActiveTemplate(null);
-        setIsEditorOpen(true);
-    };
+  const [isEditorOpen, setIsEditorOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [selectedTemplate, setSelectedTemplate] = useState<DayTemplate | null>(null);
 
-    const handleOpenEditor = (template: DayTemplate) => {
-        setActiveTemplate(template);
-        setIsEditorOpen(true);
-    };
+  const handleAdd = () => {
+    setSelectedTemplate(null);
+    setIsEditorOpen(true);
+  };
 
-    const handleOpenApply = (template: DayTemplate) => {
-        setActiveTemplate(template);
-        setIsApplyOpen(true);
-    };
+  const handleEdit = (template: DayTemplate) => {
+    setSelectedTemplate(template);
+    setIsEditorOpen(true);
+  };
 
-    const handleSave = (template: DayTemplate) => {
-        if (activeTemplate) {
-            updateTemplate(template);
-            addToast('Template updated successfully', 'success');
-        } else {
-            addTemplate(template);
-            addToast('Template created successfully', 'success');
-        }
-        setIsEditorOpen(false);
-    };
+  const handleDeleteRequest = (template: DayTemplate) => {
+    setSelectedTemplate(template);
+    setIsConfirmOpen(true);
+  };
 
-    const handleApply = (days: Day[]) => {
-        if(activeTemplate){
-            applyTemplate(activeTemplate.id, days);
-            addToast(`Template "${activeTemplate.name}" applied`, 'success');
-        }
-        setIsApplyOpen(false);
-    };
+  const handleSave = (template: DayTemplate) => {
+    if (selectedTemplate) { // Editing
+      setTemplates(prev => prev.map(t => t.id === template.id ? template : t));
+      addToast('Template updated successfully!', 'success');
+    } else { // Adding
+      setTemplates(prev => [...prev, template]);
+      addToast('Template created successfully!', 'success');
+    }
+    setIsEditorOpen(false);
+    setSelectedTemplate(null);
+  };
 
-    const handleDeleteRequest = (template: DayTemplate) => {
-        setDeletingTemplateId(template.id);
-    };
-    
-    const confirmDelete = () => {
-        if(deletingTemplateId){
-            deleteTemplate(deletingTemplateId);
-            addToast('Template deleted successfully', 'success');
-        }
-        setDeletingTemplateId(null);
-    };
+  const confirmDelete = () => {
+    if (!selectedTemplate) return;
+    setTemplates(prev => prev.filter(t => t.id !== selectedTemplate.id));
+    addToast('Template deleted successfully!', 'success');
+    setIsConfirmOpen(false);
+    setSelectedTemplate(null);
+  };
 
-    const templateToDelete = templates.find(t => t.id === deletingTemplateId);
-
-    return (
-        <div className="max-w-4xl mx-auto">
-            <div className="flex justify-between items-center mb-6">
-                <h2 className="text-2xl font-bold text-white">Schedule Templates</h2>
-                <button
-                onClick={handleOpenCreator}
-                className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors text-sm"
-                >
-                <PlusIcon className="w-5 h-5" />
-                New Template
-                </button>
+  return (
+    <div className="h-full flex flex-col">
+      <div className="flex justify-between items-center mb-6">
+        <h3 className="text-2xl font-bold text-white">Day Templates</h3>
+        <button
+          onClick={handleAdd}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors"
+        >
+          <PlusIcon className="w-5 h-5" />
+          Create Template
+        </button>
+      </div>
+      <div className="flex-grow bg-gray-900/50 rounded-lg border border-gray-700 overflow-y-auto">
+        <ul className="divide-y divide-gray-700">
+          {templates.length > 0 ? (
+            templates.map(template => (
+              <li key={template.id} className="flex items-center justify-between p-4">
+                <span className="font-medium text-white">{template.name}</span>
+                <div className="flex items-center gap-4">
+                  <button onClick={() => handleEdit(template)} className="text-gray-400 hover:text-indigo-400 transition-colors" title="Edit template">
+                    <PencilIcon className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => handleDeleteRequest(template)} className="text-gray-400 hover:text-red-400 transition-colors" title="Delete template">
+                    <TrashIcon className="w-5 h-5" />
+                  </button>
+                </div>
+              </li>
+            ))
+          ) : (
+            <div className="text-center p-8 text-gray-400">
+                <p>No templates created yet.</p>
+                <p>Templates allow you to quickly apply a pre-defined schedule to a day.</p>
             </div>
-
-            <div className="bg-gray-800 rounded-lg border border-gray-700">
-                {templates.length > 0 ? (
-                <ul className="divide-y divide-gray-700">
-                    {templates.map(template => (
-                    <li 
-                        key={template.id} 
-                        className="flex items-center justify-between p-4"
-                    >
-                        <span className="font-medium text-white">{template.name}</span>
-                        <div className="flex items-center gap-2">
-                            <button onClick={() => handleOpenApply(template)} className="flex items-center gap-1.5 px-3 py-1.5 text-xs bg-gray-700 rounded-md hover:bg-gray-600 transition-colors" aria-label="Apply template">
-                                <ClipboardDocumentListIcon className="w-4 h-4"/>
-                                Apply
-                            </button>
-                             <button onClick={() => handleOpenEditor(template)} className="p-2 text-gray-400 hover:text-white transition-colors" aria-label="Edit template">
-                                <PencilIcon className="w-5 h-5" />
-                            </button>
-                            <button onClick={() => handleDeleteRequest(template)} className="p-2 text-gray-400 hover:text-red-400 transition-colors" aria-label="Delete template">
-                                <TrashIcon className="w-5 h-5" />
-                            </button>
-                        </div>
-                    </li>
-                    ))}
-                </ul>
-                ) : (
-                    <div className="text-center p-8 text-gray-500">
-                        <p>No templates found.</p>
-                        <p className="mt-2 text-sm">Click "New Template" to create a reusable day schedule.</p>
-                    </div>
-                )}
-            </div>
-
-            <TemplateEditorModal
-                isOpen={isEditorOpen}
-                template={activeTemplate}
-                onSave={handleSave}
-                onClose={() => setIsEditorOpen(false)}
-            />
-
-            {activeTemplate && (
-                <ApplyTemplateModal
-                    isOpen={isApplyOpen}
-                    templateName={activeTemplate.name}
-                    onApply={handleApply}
-                    onClose={() => setIsApplyOpen(false)}
-                />
-            )}
-            
-            <ConfirmationModal
-                isOpen={!!deletingTemplateId}
-                message={`Are you sure you want to delete the template "${templateToDelete?.name}"?`}
-                onConfirm={confirmDelete}
-                onCancel={() => setDeletingTemplateId(null)}
-            />
-        </div>
-    );
+          )}
+        </ul>
+      </div>
+      {isEditorOpen && (
+        <TemplateEditorModal
+            isOpen={isEditorOpen}
+            template={selectedTemplate}
+            onSave={handleSave}
+            onClose={() => {
+                setIsEditorOpen(false);
+                setSelectedTemplate(null);
+            }}
+        />
+      )}
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        message={`This will permanently delete the "${selectedTemplate?.name}" template.`}
+        onConfirm={confirmDelete}
+        onCancel={() => setIsConfirmOpen(false)}
+        confirmText="Delete"
+      />
+    </div>
+  );
 };
 
 export default TemplatesView;

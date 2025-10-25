@@ -1,13 +1,16 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { ScheduledProject } from './types';
-import { DAYS_OF_WEEK, UNALLOCATED_PROJECT_ID } from './constants';
+import { ScheduledProject, Hour } from './types';
+import { DAYS_OF_WEEK, UNALLOCATED_PROJECT_ID, EPSILON } from './constants';
 import DashboardView from './components/dashboard/DashboardView';
 import ConfigurationView from './components/config/ConfigurationView';
-import { LightBulbIcon, BugAntIcon } from './components/common/Icons';
+import { LightBulbIcon, BugAntIcon } from './components/common/icons';
 import SuggestionsModal from './components/dev/SuggestionsModal';
 import { ScheduleProvider, useSchedule } from './contexts/ScheduleContext';
+import { MasterProjectsProvider } from './contexts/MasterProjectsContext';
+import { TemplatesProvider } from './contexts/TemplatesContext';
 import { ToastProvider } from './contexts/ToastContext';
 import ToastContainer from './components/common/ToastContainer';
+import ErrorBoundary from './components/common/ErrorBoundary';
 
 const AppContent: React.FC = () => {
   const { schedule } = useSchedule();
@@ -18,15 +21,15 @@ const AppContent: React.FC = () => {
   const selectFocusProject = useCallback(() => {
     const now = new Date();
     const currentDay = DAYS_OF_WEEK[now.getDay()];
-    const currentHour = now.getHours() as any;
+    const currentHour = now.getHours() as Hour;
     const projectsForCurrentHour = schedule[currentDay]?.[currentHour] || [];
     
     const totalWeight = projectsForCurrentHour.reduce((sum, p) => sum + p.probability, 0);
-    const unallocatedWeight = 1 - totalWeight;
+    const unallocatedWeight = 100 - totalWeight;
 
     const weightedList: ScheduledProject[] = [
       ...projectsForCurrentHour,
-      ...(unallocatedWeight > 0.001 ? [{ id: UNALLOCATED_PROJECT_ID, name: 'Unallocated', probability: unallocatedWeight, color: '#6B7280', masterId: UNALLOCATED_PROJECT_ID }] : [])
+      ...(unallocatedWeight > EPSILON ? [{ id: UNALLOCATED_PROJECT_ID, name: 'Unallocated', probability: unallocatedWeight, color: '#6B7280', masterId: UNALLOCATED_PROJECT_ID }] : [])
     ];
     
     setPotentialProjects(weightedList);
@@ -55,9 +58,36 @@ const AppContent: React.FC = () => {
   }, [schedule]);
 
   useEffect(() => {
+    let timerId: number;
+
+    const scheduleNextHourUpdate = () => {
+      // Clear any existing timer, just in case
+      window.clearTimeout(timerId);
+
+      // Calculate time until 1 second past the next hour to ensure the hour has changed.
+      const now = new Date();
+      const nextHour = new Date(now);
+      nextHour.setHours(now.getHours() + 1, 0, 1, 0); // Hour, Minute, Second, Millisecond
+      
+      const timeUntilNextHour = nextHour.getTime() - now.getTime();
+
+      // Set a timeout that will recursively call itself.
+      timerId = window.setTimeout(() => {
+        selectFocusProject();
+        scheduleNextHourUpdate();
+      }, timeUntilNextHour);
+    };
+    
+    // Run once on component mount
     selectFocusProject();
-    const interval = setInterval(selectFocusProject, 60000);
-    return () => clearInterval(interval);
+    
+    // Schedule the first and subsequent updates
+    scheduleNextHourUpdate();
+
+    // Cleanup on unmount
+    return () => {
+      window.clearTimeout(timerId);
+    };
   }, [selectFocusProject]);
 
   const handleManageSchedule = useCallback(() => setView('config'), []);
@@ -65,18 +95,20 @@ const AppContent: React.FC = () => {
   
   return (
     <div className="h-full flex flex-col">
-      {view === 'dashboard' ? (
-        <DashboardView 
-          currentFocus={currentFocus}
-          potentialProjects={potentialProjects}
-          onReroll={selectFocusProject}
-          onManageSchedule={handleManageSchedule}
-        />
-      ) : (
-        <ConfigurationView 
-          onBackToDashboard={handleBackToDashboard}
-        />
-      )}
+      <ErrorBoundary>
+        {view === 'dashboard' ? (
+          <DashboardView 
+            currentFocus={currentFocus}
+            potentialProjects={potentialProjects}
+            onReroll={selectFocusProject}
+            onManageSchedule={handleManageSchedule}
+          />
+        ) : (
+          <ConfigurationView 
+            onBackToDashboard={handleBackToDashboard}
+          />
+        )}
+      </ErrorBoundary>
     </div>
   );
 };
@@ -94,7 +126,7 @@ const App: React.FC = () => {
 
   return (
     <ToastProvider>
-      <div className="h-screen bg-gray-900 text-gray-100 font-sans flex flex-col">
+      <div className="min-h-screen bg-gray-900 text-gray-100 font-sans flex flex-col">
         <header className="bg-gray-900/80 backdrop-blur-sm z-40 border-b border-gray-700 shrink-0">
             <div className="container mx-auto flex justify-between items-center p-4">
               <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Project Prioritizer</h1>
@@ -119,9 +151,15 @@ const App: React.FC = () => {
         </header>
         
         <main className="container mx-auto p-4 flex-grow flex flex-col">
-          <ScheduleProvider useMockData={devUseMockData}>
-            <AppContent />
-          </ScheduleProvider>
+          <ErrorBoundary>
+            <ScheduleProvider useMockData={devUseMockData}>
+              <MasterProjectsProvider useMockData={devUseMockData}>
+                <TemplatesProvider useMockData={devUseMockData}>
+                  <AppContent />
+                </TemplatesProvider>
+              </MasterProjectsProvider>
+            </ScheduleProvider>
+          </ErrorBoundary>
         </main>
 
         <SuggestionsModal isOpen={isSuggestionsOpen} onClose={() => setIsSuggestionsOpen(false)} />

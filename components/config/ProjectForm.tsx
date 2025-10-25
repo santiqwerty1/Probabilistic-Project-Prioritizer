@@ -1,8 +1,10 @@
 import React, { useState, useEffect } from 'react';
 import { ScheduledProject, MasterProject } from '../../types';
-import { TrashIcon } from '../common/Icons';
+import { TrashIcon } from '../common/icons';
 import ConfirmationModal from '../common/ConfirmationModal';
-import { useSchedule } from '../../contexts/ScheduleContext';
+import { useMasterProjects } from '../../contexts/MasterProjectsContext';
+import { EPSILON } from '../../constants';
+import { generateUUID } from '../../utils';
 
 interface ProjectFormProps {
   project: ScheduledProject | null;
@@ -13,14 +15,14 @@ interface ProjectFormProps {
 }
 
 const ProjectForm: React.FC<ProjectFormProps> = ({ project, projectsForSlot, onSave, onDelete, onClose }) => {
-  const { masterProjects } = useSchedule();
+  const { masterProjects } = useMasterProjects();
   const [masterId, setMasterId] = useState<string>('');
-  const [probability, setProbability] = useState(1);
+  const [probability, setProbability] = useState(100);
   const [showConfirm, setShowConfirm] = useState(false);
 
   const availableCapacity = projectsForSlot
     .filter(p => p.id !== project?.id) // Exclude the project being edited
-    .reduce((capacity, p) => capacity - p.probability, 1.0);
+    .reduce((capacity, p) => capacity - p.probability, 100.0);
   
   const remainingCapacity = Math.max(0, availableCapacity);
 
@@ -30,8 +32,8 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, projectsForSlot, onS
       setProbability(project.probability);
     } else {
       setMasterId(masterProjects[0]?.id || '');
-      // Default to remaining capacity or 1 if slot is empty
-      setProbability(Math.min(1, remainingCapacity > 0.001 ? Number(remainingCapacity.toFixed(2)) : 1));
+      // Default to remaining capacity or 100 if slot is empty
+      setProbability(Math.min(100, remainingCapacity > EPSILON ? Number(remainingCapacity.toFixed(0)) : 100));
     }
   }, [project, masterProjects, remainingCapacity]);
 
@@ -43,10 +45,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, projectsForSlot, onS
     const maxAllowed = remainingCapacity + (project?.probability || 0);
 
     if (enteredProbability <= 0) {
-        // Silently cap at 0.01 or handle error
+        // Silently cap at 1 or handle error
         return;
     }
-    if (enteredProbability > maxAllowed + 0.001) { // Add tolerance for floating point
+    if (enteredProbability > maxAllowed + EPSILON) { // Add tolerance for floating point
         // Silently cap at max or handle error
         return;
     }
@@ -55,7 +57,7 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, projectsForSlot, onS
     if (!selectedMaster) return;
 
     onSave({
-      id: project ? project.id : `${masterId}-${new Date().toISOString()}`,
+      id: project ? project.id : generateUUID(),
       masterId: selectedMaster.id,
       name: selectedMaster.name,
       color: selectedMaster.color,
@@ -100,10 +102,10 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, projectsForSlot, onS
       <div>
         <div className="flex justify-between items-center mb-2">
             <label htmlFor="probability" className="block text-sm font-medium text-gray-300">
-            Probability Weight
+            Probability (%)
             </label>
             <span className="text-xs text-gray-400">
-                Available: {((remainingCapacity + (project?.probability || 0))).toFixed(2)}
+                Available: {((remainingCapacity + (project?.probability || 0))).toFixed(0)}%
             </span>
         </div>
         <input
@@ -112,9 +114,9 @@ const ProjectForm: React.FC<ProjectFormProps> = ({ project, projectsForSlot, onS
           value={probability}
           onChange={(e) => setProbability(Number(e.target.value))}
           className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-          min="0.01"
-          step="0.01"
-          max={((remainingCapacity + (project?.probability || 0)))}
+          min="1"
+          step="1"
+          max={Math.floor((remainingCapacity + (project?.probability || 0)))}
           required
         />
       </div>

@@ -1,6 +1,6 @@
 import React from 'react';
 import { ScheduledProject } from '../../types';
-import { MoonIcon, ArrowPathIcon, Cog6ToothIcon } from '../common/Icons';
+import { MoonIcon, ArrowPathIcon, Cog6ToothIcon } from '../common/icons';
 
 interface DashboardViewProps {
   currentFocus: ScheduledProject | null;
@@ -25,9 +25,9 @@ const DashboardView: React.FC<DashboardViewProps> = ({ currentFocus, potentialPr
           </div>
         ) : (
           <div className="flex flex-col items-center">
-            <MoonIcon className="w-16 h-16 text-gray-500 mx-auto mb-6 flex-shrink-0" />
+            <MoonIcon className="w-16 h-16 text-gray-400 mx-auto mb-6 flex-shrink-0" />
             <h1 className="text-3xl md:text-4xl font-bold text-gray-400">Free Time</h1>
-            <p className="text-gray-500 mt-2 text-sm">No projects scheduled for this hour.</p>
+            <p className="text-gray-400 mt-2 text-sm">No projects scheduled for this hour.</p>
           </div>
         )}
       </div>
@@ -47,7 +47,7 @@ const DashboardView: React.FC<DashboardViewProps> = ({ currentFocus, potentialPr
                                 <div className="w-4 h-4 rounded-full flex-shrink-0" style={{ backgroundColor: project.color }}></div>
                                 <span className="font-medium text-white truncate">{project.name}</span>
                             </div>
-                            <span className="font-mono text-gray-300 ml-4">{(project.probability * 100).toFixed(0)}%</span>
+                            <span className="font-mono text-gray-300 ml-4">{project.probability.toFixed(0)}%</span>
                         </li>
                     )
                 })}

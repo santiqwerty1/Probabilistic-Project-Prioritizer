@@ -1,95 +1,136 @@
 import React, { useState } from 'react';
+import { useMasterProjects } from '../../contexts/MasterProjectsContext';
 import { MasterProject } from '../../types';
-import { TrashIcon, PlusIcon } from '../common/Icons';
+import { PlusIcon, PencilIcon, TrashIcon } from '../common/icons';
 import Modal from '../common/Modal';
 import ProjectMasterForm from './ProjectMasterForm';
+import ConfirmationModal from '../common/ConfirmationModal';
 import { useSchedule } from '../../contexts/ScheduleContext';
 import { useToast } from '../../contexts/ToastContext';
 
-interface ProjectsViewProps {
-  onDelete: (project: MasterProject) => void;
-  onOpenScheduleEditor: (project: MasterProject) => void;
-}
-
-const ProjectsView: React.FC<ProjectsViewProps> = ({ onDelete, onOpenScheduleEditor }) => {
-  const { masterProjects, addMasterProject, updateMasterProject } = useSchedule();
+const ProjectsView: React.FC = () => {
+  const { masterProjects, setMasterProjects } = useMasterProjects();
+  const { schedule, setSchedule } = useSchedule();
   const { addToast } = useToast();
-  const [isModalOpen, setIsModalOpen] = useState(false);
-  const [editingProject, setEditingProject] = useState<MasterProject | null>(null);
 
-  const handleAddClick = () => {
-    setEditingProject(null);
-    setIsModalOpen(true);
+  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isConfirmOpen, setIsConfirmOpen] = useState(false);
+  const [selectedProject, setSelectedProject] = useState<MasterProject | null>(null);
+
+  const handleAdd = () => {
+    setSelectedProject(null);
+    setIsFormOpen(true);
   };
-  
-  const handleDeleteClick = (e: React.MouseEvent, project: MasterProject) => {
-    e.stopPropagation(); // Prevent opening the schedule editor
-    onDelete(project);
-  }
+
+  const handleEdit = (project: MasterProject) => {
+    setSelectedProject(project);
+    setIsFormOpen(true);
+  };
+
+  const handleDeleteRequest = (project: MasterProject) => {
+    setSelectedProject(project);
+    setIsConfirmOpen(true);
+  };
 
   const handleSave = (project: MasterProject) => {
-    if (editingProject) {
-      updateMasterProject(project);
-      addToast('Project updated successfully', 'success');
-    } else {
-      addMasterProject(project);
-      addToast('Project created successfully', 'success');
+    if (selectedProject) { // Editing existing
+      setMasterProjects(prev => prev.map(p => p.id === project.id ? project : p));
+      
+      // Also update name and color in the schedule
+      const newSchedule = { ...schedule };
+      Object.keys(newSchedule).forEach(day => {
+        Object.keys(newSchedule[day]!).forEach(hour => {
+          newSchedule[day]![hour] = newSchedule[day]![hour]!.map(sp => 
+            sp.masterId === project.id ? { ...sp, name: project.name, color: project.color } : sp
+          );
+        });
+      });
+      setSchedule(newSchedule);
+      addToast('Project updated successfully!', 'success');
+    } else { // Adding new
+      setMasterProjects(prev => [...prev, project]);
+      addToast('Project added successfully!', 'success');
     }
-    setIsModalOpen(false);
+    setIsFormOpen(false);
+    setSelectedProject(null);
+  };
+  
+  const confirmDelete = () => {
+    if (!selectedProject) return;
+
+    // Check if project is in use
+    const isInUse = Object.values(schedule).some(daySchedule =>
+        Object.values(daySchedule).some(hourProjects =>
+            hourProjects.some(p => p.masterId === selectedProject.id)
+        )
+    );
+    
+    if (isInUse) {
+        addToast('Cannot delete project because it is currently used in the schedule.', 'error');
+        setIsConfirmOpen(false);
+        setSelectedProject(null);
+        return;
+    }
+
+    setMasterProjects(prev => prev.filter(p => p.id !== selectedProject.id));
+    addToast('Project deleted successfully!', 'success');
+    setIsConfirmOpen(false);
+    setSelectedProject(null);
   };
 
   return (
-    <div className="max-w-4xl mx-auto">
+    <div className="h-full flex flex-col">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-white">Master Project List</h2>
+        <h3 className="text-2xl font-bold text-white">Master Project List</h3>
         <button
-          onClick={handleAddClick}
-          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors text-sm"
+          onClick={handleAdd}
+          className="flex items-center gap-2 px-4 py-2 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors"
         >
           <PlusIcon className="w-5 h-5" />
-          New Project
+          Add Project
         </button>
       </div>
-
-      <div className="bg-gray-800 rounded-lg border border-gray-700">
-        {masterProjects.length > 0 ? (
-          <ul className="divide-y divide-gray-700">
-            {masterProjects.map(project => (
-              <li 
-                key={project.id} 
-                className="flex items-center justify-between p-4 hover:bg-gray-700/50 cursor-pointer transition-colors"
-                onClick={() => onOpenScheduleEditor(project)}
-              >
+      <div className="flex-grow bg-gray-900/50 rounded-lg border border-gray-700 overflow-y-auto">
+        <ul className="divide-y divide-gray-700">
+          {masterProjects.length > 0 ? (
+            masterProjects.map(project => (
+              <li key={project.id} className="flex items-center justify-between p-4">
                 <div className="flex items-center gap-4">
-                  <span
-                    className="w-6 h-6 rounded-full border-2 border-gray-600"
-                    style={{ backgroundColor: project.color }}
-                  ></span>
+                  <div className="w-4 h-4 rounded-full" style={{ backgroundColor: project.color }} />
                   <span className="font-medium text-white">{project.name}</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <button onClick={(e) => handleDeleteClick(e, project)} className="p-2 text-gray-400 hover:text-red-400 transition-colors" aria-label="Delete project">
+                <div className="flex items-center gap-4">
+                  <button onClick={() => handleEdit(project)} className="text-gray-400 hover:text-indigo-400 transition-colors" title="Edit project">
+                    <PencilIcon className="w-5 h-5" />
+                  </button>
+                  <button onClick={() => handleDeleteRequest(project)} className="text-gray-400 hover:text-red-400 transition-colors" title="Delete project">
                     <TrashIcon className="w-5 h-5" />
                   </button>
                 </div>
               </li>
-            ))}
-          </ul>
-        ) : (
-            <div className="text-center p-8 text-gray-500">
-                <p>No projects found.</p>
-                <p className="mt-2 text-sm">Click "New Project" to get started.</p>
+            ))
+          ) : (
+            <div className="text-center p-8 text-gray-400">
+                <p>No master projects created yet.</p>
+                <p>Click "Add Project" to get started.</p>
             </div>
-        )}
+          )}
+        </ul>
       </div>
-
-      <Modal isOpen={isModalOpen} onClose={() => setIsModalOpen(false)}>
+      <Modal isOpen={isFormOpen} onClose={() => setIsFormOpen(false)}>
         <ProjectMasterForm
-          project={editingProject}
+          project={selectedProject}
           onSave={handleSave}
-          onClose={() => setIsModalOpen(false)}
+          onClose={() => setIsFormOpen(false)}
         />
       </Modal>
+      <ConfirmationModal
+        isOpen={isConfirmOpen}
+        message={`This will permanently delete the "${selectedProject?.name}" project. This action cannot be undone.`}
+        onConfirm={confirmDelete}
+        onCancel={() => setIsConfirmOpen(false)}
+        confirmText="Delete"
+      />
     </div>
   );
 };

@@ -1,5 +1,5 @@
-import React, { ReactNode } from 'react';
-import { XMarkIcon } from './Icons';
+import React, { ReactNode, useEffect, useRef } from 'react';
+import { XMarkIcon } from './icons';
 
 interface ModalProps {
   isOpen: boolean;
@@ -9,6 +9,58 @@ interface ModalProps {
 }
 
 const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, size = 'md' }) => {
+  const modalRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!isOpen) return;
+    
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+      }
+      
+      if (e.key === 'Tab' && modalRef.current) {
+        const focusableElements = modalRef.current.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        
+        if (focusableElements.length === 0) return;
+
+        const firstElement = focusableElements[0];
+        const lastElement = focusableElements[focusableElements.length - 1];
+
+        if (e.shiftKey) { // Shift + Tab
+          if (document.activeElement === firstElement) {
+            lastElement.focus();
+            e.preventDefault();
+          }
+        } else { // Tab
+          if (document.activeElement === lastElement) {
+            firstElement.focus();
+            e.preventDefault();
+          }
+        }
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    
+    // Defer focusing until the modal is fully rendered
+    setTimeout(() => {
+        const focusableElements = modalRef.current?.querySelectorAll<HTMLElement>(
+          'button, [href], input, select, textarea, [tabindex]:not([tabindex="-1"])'
+        );
+        if (focusableElements && focusableElements.length > 0) {
+          focusableElements[0].focus();
+        }
+    }, 100);
+
+
+    return () => {
+      document.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [isOpen, onClose]);
+
   if (!isOpen) return null;
 
   const sizeClasses = {
@@ -20,8 +72,11 @@ const Modal: React.FC<ModalProps> = ({ isOpen, onClose, children, size = 'md' })
     <div 
       className="fixed inset-0 bg-black bg-opacity-70 z-50 flex overflow-y-auto p-4"
       onClick={onClose}
+      role="dialog"
+      aria-modal="true"
     >
       <div 
+        ref={modalRef}
         className={`bg-gray-800 rounded-lg shadow-xl p-6 w-full ${sizeClasses[size]} m-auto relative border border-gray-700`}
         onClick={e => e.stopPropagation()}
       >

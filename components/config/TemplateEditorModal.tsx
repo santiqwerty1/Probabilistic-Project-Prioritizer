@@ -1,11 +1,10 @@
-
 import React, { useState, useEffect } from 'react';
+import Modal from '../common/Modal';
 import { DayTemplate, Hour, ScheduledProject } from '../../types';
 import { HOURS_OF_DAY } from '../../constants';
-import Modal from '../common/Modal';
-import ProjectForm from './ProjectForm';
-import { useSchedule } from '../../contexts/ScheduleContext';
-import { PlusIcon, TrashIcon } from '../common/Icons';
+import { generateUUID } from '../../utils';
+import HourScheduleEditorModal from './HourScheduleEditorModal';
+import { PencilIcon } from '../common/icons';
 
 interface TemplateEditorModalProps {
   isOpen: boolean;
@@ -15,166 +14,152 @@ interface TemplateEditorModalProps {
 }
 
 const TemplateEditorModal: React.FC<TemplateEditorModalProps> = ({ isOpen, template, onSave, onClose }) => {
-  const { masterProjects } = useSchedule();
   const [name, setName] = useState('');
   const [schedule, setSchedule] = useState<DayTemplate['schedule']>({});
-  
-  const [isSlotModalOpen, setIsSlotModalOpen] = useState(false);
+
+  // State for the new hour editor modal
+  const [isHourEditorOpen, setIsHourEditorOpen] = useState(false);
   const [selectedHour, setSelectedHour] = useState<Hour | null>(null);
-  const [editingProject, setEditingProject] = useState<ScheduledProject | null>(null);
 
   useEffect(() => {
-    if (isOpen) {
-        if (template) {
-            setName(template.name);
-            setSchedule(template.schedule);
-        } else {
-            setName('');
-            setSchedule({});
-        }
+    if (template) {
+      setName(template.name);
+      setSchedule(template.schedule);
+    } else {
+      setName('');
+      setSchedule({});
     }
-  }, [isOpen, template]);
+  }, [template, isOpen]);
 
-  const handleAddProjectClick = (hour: Hour) => {
-    setSelectedHour(hour);
-    setEditingProject(null);
-    setIsSlotModalOpen(true);
-  };
-
-  const handleEditProjectClick = (project: ScheduledProject, hour: Hour) => {
-    setSelectedHour(hour);
-    setEditingProject(project);
-    setIsSlotModalOpen(true);
-  }
-
-  const handleSaveScheduledProject = (project: ScheduledProject) => {
-    if (selectedHour === null) return;
-    
-    setSchedule(prev => {
-        const newSchedule = { ...prev };
-        const projects = [...(newSchedule[selectedHour] || [])];
-        const existingIndex = projects.findIndex(p => p.id === project.id);
-
-        if (existingIndex > -1) {
-            projects[existingIndex] = project;
-        } else {
-            projects.push(project);
-        }
-        newSchedule[selectedHour] = projects;
-        return newSchedule;
+  const handleSave = () => {
+    if (!name.trim()) return;
+    onSave({
+      id: template?.id || generateUUID(),
+      name: name.trim(),
+      schedule,
     });
-
-    setIsSlotModalOpen(false);
-    setEditingProject(null);
   };
 
-  const handleDeleteScheduledProject = (projectId: string) => {
+  const handleOpenHourEditor = (hour: Hour) => {
+    setSelectedHour(hour);
+    setIsHourEditorOpen(true);
+  };
+
+  const handleCloseHourEditor = () => {
+    setIsHourEditorOpen(false);
+    setSelectedHour(null);
+  };
+  
+  const handleSaveHourSchedule = (projects: ScheduledProject[]) => {
     if (selectedHour === null) return;
     setSchedule(prev => {
         const newSchedule = { ...prev };
-        if (!newSchedule[selectedHour]) return newSchedule;
-        
-        newSchedule[selectedHour] = newSchedule[selectedHour]?.filter(p => p.id !== projectId);
-        if(newSchedule[selectedHour]?.length === 0) {
+        if (projects.length > 0) {
+            newSchedule[selectedHour] = projects;
+        } else {
             delete newSchedule[selectedHour];
         }
         return newSchedule;
     });
-    setIsSlotModalOpen(false);
-    setEditingProject(null);
   };
 
-  const handleSubmit = () => {
-    if (!name.trim()) {
-        alert("Template name cannot be empty.");
-        return;
+  const projectsForSelectedHour = selectedHour !== null ? schedule[selectedHour] || [] : [];
+  
+  const renderProjectSummary = (projects: ScheduledProject[]) => {
+    if (projects.length === 0) {
+        return <span className="text-gray-500 italic">No projects assigned</span>;
     }
-    onSave({
-        id: template ? template.id : `template-${Date.now()}`,
-        name,
-        schedule
-    });
-  }
+    return (
+        <div className="flex flex-wrap gap-x-3 gap-y-1">
+            {projects.map(p => (
+                <div key={p.id} className="flex items-center gap-1.5 text-xs bg-gray-700 px-2 py-0.5 rounded">
+                    <div className="w-2.5 h-2.5 rounded-full" style={{backgroundColor: p.color}} />
+                    <span>{p.name}</span>
+                    <span className="text-gray-400">({p.probability.toFixed(0)}%)</span>
+                </div>
+            ))}
+        </div>
+    );
+  };
 
   return (
     <>
     <Modal isOpen={isOpen} onClose={onClose} size="5xl">
-      <div className="space-y-6">
-        <h2 className="text-2xl font-bold text-white">{template ? 'Edit Template' : 'Create New Template'}</h2>
+      <div className="flex flex-col h-[80vh]">
+        <h2 className="text-2xl font-bold text-white mb-4 flex-shrink-0">{template ? 'Edit Template' : 'Create New Template'}</h2>
         
-        <div>
-            <label htmlFor="templateName" className="block text-sm font-medium text-gray-300 mb-2">Template Name</label>
-            <input 
-                type="text" 
-                id="templateName"
-                value={name}
-                onChange={e => setName(e.target.value)}
-                placeholder="e.g., Productive Workday"
-                className="w-full bg-gray-700 border border-gray-600 text-white rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
-                required
-            />
+        <div className="mb-6 flex-shrink-0">
+          <label htmlFor="templateName" className="block text-sm font-medium text-gray-300 mb-2">
+            Template Name
+          </label>
+          <input
+            type="text"
+            id="templateName"
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            className="w-full max-w-sm bg-gray-700 border border-gray-600 text-white rounded-lg p-3 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none"
+            placeholder="e.g., Productive Workday"
+            required
+          />
         </div>
 
-        <div className="bg-gray-900/50 p-4 rounded-lg border border-gray-700 max-h-[50vh] overflow-y-auto">
-            <h3 className="text-lg font-semibold mb-2">Day Schedule</h3>
-            <div className="space-y-2">
-                {HOURS_OF_DAY.map(hour => {
-                    const projects = schedule[hour] || [];
-                    const totalWeight = projects.reduce((sum, p) => sum + p.probability, 0);
+        <p className="text-sm text-gray-400 mb-4 flex-shrink-0">Configure the schedule for this template by adding projects to each hour.</p>
 
-                    return (
-                        <div key={hour} className="flex items-start gap-3 p-2 rounded-md bg-gray-800/70">
-                            <div className="w-20 text-right font-mono text-sm text-gray-400 shrink-0 pt-1">
-                                {hour}:00 - {hour+1}:00
-                            </div>
-                            <div className="flex-grow border-l border-gray-600 pl-3">
-                                {projects.length > 0 ? (
-                                    <div className="space-y-1">
-                                    {projects.map(p => (
-                                        <div key={p.id} onClick={() => handleEditProjectClick(p, hour)} className="flex justify-between items-center bg-gray-700 p-1.5 rounded cursor-pointer hover:bg-gray-600">
-                                            <div className="flex items-center gap-2">
-                                                <div className="w-4 h-4 rounded-full" style={{backgroundColor: p.color}}></div>
-                                                <span className="text-sm font-medium">{p.name}</span>
-                                            </div>
-                                            <span className="text-sm font-mono text-gray-300">{(p.probability * 100).toFixed(0)}%</span>
-                                        </div>
-                                    ))}
-                                    </div>
-                                ) : (
-                                    <p className="text-sm text-gray-500 italic pt-1">No projects scheduled.</p>
-                                )}
-                            </div>
-                            {totalWeight < 1 && masterProjects.length > 0 && (
-                                <button onClick={() => handleAddProjectClick(hour)} className="p-2 bg-gray-700 rounded-full text-gray-300 hover:bg-indigo-600 hover:text-white transition-colors">
-                                    <PlusIcon className="w-4 h-4" />
-                                </button>
-                            )}
-                        </div>
-                    )
-                })}
-            </div>
+        <div className="flex-grow overflow-y-auto bg-gray-900/50 p-2 border border-gray-700 rounded-lg">
+          <div className="space-y-1">
+              {HOURS_OF_DAY.map(hour => {
+                const projects = schedule[hour] || [];
+                return (
+                  <button 
+                    key={hour}
+                    onClick={() => handleOpenHourEditor(hour)}
+                    className="group w-full flex items-center justify-between p-3 rounded-lg hover:bg-gray-700/50 transition-colors text-left"
+                    aria-label={`Configure schedule for ${hour.toString().padStart(2, '0')}:00`}
+                  >
+                    <div className="flex items-center flex-grow min-w-0">
+                      <div className="w-24 text-center font-mono text-gray-400 flex-shrink-0">{`${hour.toString().padStart(2, '0')}:00`}</div>
+                      <div className="flex-grow px-4 truncate">
+                          {renderProjectSummary(projects)}
+                      </div>
+                    </div>
+                    <div className="flex-shrink-0 ml-4">
+                        <PencilIcon className="w-5 h-5 text-gray-600 group-hover:text-white transition-colors" />
+                    </div>
+                  </button>
+                );
+              })}
+          </div>
         </div>
 
-        <div className="flex justify-end items-center pt-4 gap-4">
-          <button type="button" onClick={onClose} className="px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500 transition-colors">Cancel</button>
-          <button type="button" onClick={handleSubmit} className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors">
+        <div className="flex justify-end gap-4 pt-6 flex-shrink-0">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-6 py-3 bg-gray-600 text-white font-semibold rounded-lg hover:bg-gray-500 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={!name.trim()}
+            className="px-6 py-3 bg-indigo-600 text-white font-semibold rounded-lg hover:bg-indigo-500 transition-colors disabled:bg-gray-500 disabled:cursor-not-allowed"
+          >
             {template ? 'Save Changes' : 'Create Template'}
           </button>
         </div>
       </div>
     </Modal>
-    
-    <Modal isOpen={isSlotModalOpen} onClose={() => setIsSlotModalOpen(false)}>
-        {selectedHour !== null && (
-            <ProjectForm
-                project={editingProject}
-                projectsForSlot={schedule[selectedHour] || []}
-                onSave={handleSaveScheduledProject}
-                onDelete={handleDeleteScheduledProject}
-                onClose={() => setIsSlotModalOpen(false)}
-            />
-        )}
-    </Modal>
+
+    {isHourEditorOpen && selectedHour !== null && (
+        <HourScheduleEditorModal
+            isOpen={isHourEditorOpen}
+            onClose={handleCloseHourEditor}
+            onSave={handleSaveHourSchedule}
+            initialProjects={projectsForSelectedHour}
+            hour={selectedHour}
+        />
+    )}
     </>
   );
 };
