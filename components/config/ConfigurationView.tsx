@@ -233,7 +233,7 @@ const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                         
                         {viewMode === 'detail' && (
                             <div className="flex items-center gap-2">
-                                <MagnifyingGlassMinusIcon className="w-5 h-5 text-gray-400" />
+                                <MagnifyingGlassPlusIcon className="w-5 h-5 text-gray-400" />
                                 <input
                                     type="range"
                                     id="zoom"
@@ -244,7 +244,7 @@ const ConfigurationView: React.FC<ConfigurationViewProps> = ({
                                     className="w-24 h-1.5 bg-gray-600 rounded-lg appearance-none cursor-pointer accent-indigo-500"
                                     title="Zoom schedule view"
                                 />
-                                <MagnifyingGlassPlusIcon className="w-5 h-5 text-gray-400" />
+                                <MagnifyingGlassMinusIcon className="w-5 h-5 text-gray-400" />
                             </div>
                         )}
                     </>
@@ -259,20 +259,15 @@ const ConfigurationView: React.FC<ConfigurationViewProps> = ({
             {activeTab === 'schedule' ? (
                 viewMode === 'detail' ? (
                     <div className="overflow-auto rounded-lg border border-gray-700 bg-gray-800/20">
-                        <table className="border-collapse" style={{ tableLayout: 'fixed' }}>
-                             <colgroup>
-                                <col className="w-12" />
-                                {DAYS_OF_WEEK.map(day => (
-                                    <col key={day} style={{ width: `${columnWidth}px` }} />
-                                ))}
-                            </colgroup>
+                        <table className="border-collapse">
                             <thead className="sticky top-0 z-30">
                                 <tr>
                                     <th className="sticky left-0 bg-gray-800/95 backdrop-blur-sm z-20 w-12 p-0"></th>
                                     {DAYS_OF_WEEK.map(day => (
-                                        <th 
-                                            key={day} 
-                                            scope="col" 
+                                        <th
+                                            key={day}
+                                            scope="col"
+                                            style={{ width: `${columnWidth}px` }}
                                             className="p-2 text-xs text-center text-gray-300 uppercase border-b border-l border-gray-700 bg-gray-800/95 backdrop-blur-sm"
                                         >
                                             {day}
